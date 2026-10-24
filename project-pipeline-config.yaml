@@ -1,0 +1,11 @@
+project-config:
+  project-name: infisical
+  project-description: "Helm chart that installs Infisical in the cluster"
+  project-namespace: infisical
+  publish-targets: [ghcr]
+  pipeline-steps:
+    helm-test: true
+    trivy-scan: true
+    opengrep-scan: true
+    helm-package-upload: true
+    argo-deploy: true
