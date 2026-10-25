@@ -113,8 +113,9 @@ spec:
               set -eu
               existing="$(kubectl get secret "$NAME" -n "$NS" --ignore-not-found -o name --request-timeout=20s)"
               [ -z "$existing" ] || exit 0
-              ENCRYPTION_KEY="$(openssl rand -hex 16)"
-              AUTH_SECRET="$(openssl rand -base64 32)"
+              ENCRYPTION_KEY="$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+              AUTH_SECRET="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+              [ "${#ENCRYPTION_KEY}" -eq 32 ] && [ "${#AUTH_SECRET}" -eq 44 ]
               if kubectl create secret generic "$NAME" -n "$NS" --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" --from-literal=AUTH_SECRET="$AUTH_SECRET" --request-timeout=20s; then exit 0; fi
               existing="$(kubectl get secret "$NAME" -n "$NS" --ignore-not-found -o name --request-timeout=20s)"
               [ -n "$existing" ]
