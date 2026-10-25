@@ -50,10 +50,11 @@ ingressRoute:
   # TLS Secret name (required when enabled).
   tlsSecretName: ""
   # Traefik entry points.
-  entryPoints: [websecure]
+  entryPoints:
+    - websecure
   # Value of the kubernetes.io/ingress.class annotation.
   ingressClass: traefik-external
-  # Traefik middlewares: list of {name, namespace}.
+  # Traefik middlewares: list of name and namespace entries.
   middlewares: []
 
 # Values passed to the upstream infisical-standalone dependency (used as-is, never forked).
@@ -65,26 +66,56 @@ infisical-standalone:
     extraEnv:
       # Site URL from the wrapper ConfigMap.
       - name: SITE_URL
-        valueFrom: { configMapKeyRef: { name: infisical-config, key: SITE_URL } }
+        valueFrom:
+          configMapKeyRef:
+            name: infisical-config
+            key: SITE_URL
       # SMTP settings from the optional SMTP Secret (absent Secret is tolerated).
       - name: SMTP_HOST
-        valueFrom: { secretKeyRef: { name: infisical-smtp-secret, key: SMTP_HOST, optional: true } }
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_HOST
+            optional: true
       - name: SMTP_USERNAME
-        valueFrom: { secretKeyRef: { name: infisical-smtp-secret, key: SMTP_USERNAME, optional: true } }
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_USERNAME
+            optional: true
       - name: SMTP_PASSWORD
-        valueFrom: { secretKeyRef: { name: infisical-smtp-secret, key: SMTP_PASSWORD, optional: true } }
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_PASSWORD
+            optional: true
       - name: SMTP_FROM_ADDRESS
-        valueFrom: { secretKeyRef: { name: infisical-smtp-secret, key: SMTP_FROM_ADDRESS, optional: true } }
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_FROM_ADDRESS
+            optional: true
       - name: SMTP_FROM_NAME
-        valueFrom: { secretKeyRef: { name: infisical-smtp-secret, key: SMTP_FROM_NAME, optional: true } }
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_FROM_NAME
+            optional: true
       - name: SMTP_HELO_HOST
-        valueFrom: { secretKeyRef: { name: infisical-smtp-secret, key: SMTP_HELO_HOST, optional: true } }
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_HELO_HOST
+            optional: true
   ingress:
     # Upstream Ingress off; routing is the wrapper IngressRoute.
     enabled: false
     # Upstream dependency condition for ingress-nginx (upstream default is true).
-    nginx: { enabled: false }
+    nginx:
+      enabled: false
   # Bundled PostgreSQL off; DB env is supplied in cluster-config.
-  postgresql: { enabled: false }
+  postgresql:
+    enabled: false
   # Bundled Redis off; Redis env is supplied in cluster-config.
-  redis: { enabled: false }
+  redis:
+    enabled: false
