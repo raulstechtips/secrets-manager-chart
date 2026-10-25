@@ -9,11 +9,8 @@ We use the upstream chart only through values. We never fork or patch its templa
 
 The wrapper owns these resources:
 
-- The ConfigMap `infisical-config`, with the key `SITE_URL`.
-- An optional PreSync Job that creates the bootstrap Secret on a fresh install (`bootstrap.generateKeys`).
 - An optional `InfisicalStaticSecret` that syncs the SMTP Secret from Infisical (`smtp.enabled`).
 - An optional Traefik IngressRoute (`ingressRoute.enabled`).
-- Render guards that stop a bad values file before it reaches the cluster.
 
 Everything else (Deployment, Service, ServiceAccount) comes from the upstream chart.
 The upstream Ingress, bundled PostgreSQL and bundled Redis are off. The database is CNPG and Redis runs on its own.
@@ -27,10 +24,10 @@ oci://ghcr.io/raulstechtips/charts/infisical
 ## Before first install
 
 Infisical needs two root keys: `ENCRYPTION_KEY` and `AUTH_SECRET`.
-They live in the Secret `infisical-bootstrap` and in NordPass. They never go into git.
-The pod reads them through `infisical-standalone.infisical.kubeSecretRef` (envFrom).
+They live in NordPass and in the Secret `infisical-bootstrap`. They never go into git.
+The pod reads them through `infisical-standalone.infisical.kubeSecretRef` (envFrom). The chart never creates or changes this Secret.
 
-If the keys already exist in NordPass, create the Secret by hand before the first sync:
+Create the namespace and the Secret by hand before the first sync:
 
 ```sh
 kubectl create namespace infisical
@@ -39,41 +36,16 @@ kubectl create secret generic infisical-bootstrap -n infisical \
   --from-literal=AUTH_SECRET=<from NordPass>
 ```
 
-Key formats:
+For a brand-new Infisical (empty database) there are no keys yet. Generate them once on your workstation and store both in NordPass FIRST, then create the Secret as above:
 
-| Key | Format |
-| --- | --- |
-| `ENCRYPTION_KEY` | 32 hex characters (16 random bytes). |
-| `AUTH_SECRET` | Base64 of 32 random bytes (44 characters). |
+```sh
+openssl rand -hex 16     # ENCRYPTION_KEY
+openssl rand -base64 32  # AUTH_SECRET
+```
 
-Losing these keys makes every stored secret unrecoverable. An existing Secret always wins: the chart never changes it.
+Losing these keys makes every stored secret unrecoverable.
 
-## Fresh install with bootstrap.generateKeys
-
-Use this only for a brand new Infisical with an empty database.
-Set `bootstrap.generateKeys: true` in cluster-config and sync.
-
-What happens:
-
-1. A PreSync hook Job (`infisical-bootstrap-keys`) checks for the Secret named by `bootstrap.existingSecret`.
-2. If the Secret exists, the Job exits and changes nothing.
-3. If it is missing, the Job generates both keys and creates the Secret. It never updates, patches or deletes a Secret.
-4. The hook objects are deleted when the Job succeeds.
-
-Then do this right away:
-
-1. Copy both keys into NordPass:
-   ```sh
-   kubectl get secret infisical-bootstrap -n infisical -o jsonpath='{.data.ENCRYPTION_KEY}' | base64 -d
-   kubectl get secret infisical-bootstrap -n infisical -o jsonpath='{.data.AUTH_SECRET}' | base64 -d
-   ```
-2. Set `bootstrap.generateKeys` back to `false`.
-
-Notes:
-
-- The Job's Role can create any Secret in the namespace while generation is on. Kubernetes can't limit `create` by name. The `get` rule is limited to the bootstrap Secret. Turn generation off when you're done.
-- Hooks run only on a full sync. A selective sync of single resources skips them.
-- The Job image is the public, digest-pinned `alpine/k8s:1.30.14` set in `values.yaml` (`bootstrap.jobImage`).
+`SITE_URL` is not a chart value. Set it in the cluster-config `extraEnv` list with the other pod env.
 
 ## Values reference
 
@@ -81,14 +53,10 @@ Defaults are in `charts/values.yaml`. Environment values go in cluster-config.
 
 | Key | Default | Meaning |
 | --- | --- | --- |
-| `siteUrl` | `http://localhost:8080` | Public URL. Rendered to ConfigMap `infisical-config` key `SITE_URL`. |
-| `bootstrap.generateKeys` | `false` | `true` runs the PreSync Job that creates `bootstrap.existingSecret` if it's missing. |
-| `bootstrap.existingSecret` | `infisical-bootstrap` | Secret holding `ENCRYPTION_KEY` and `AUTH_SECRET`. Required. |
-| `bootstrap.jobImage` | `alpine/k8s:1.30.14@sha256:...` | Tools image for the key Job. Must not be empty. |
-| `infisical.authRef.name` | `""` | `InfisicalAuth` used by the SMTP `InfisicalStaticSecret`. |
-| `infisical.authRef.namespace` | `""` | Namespace of that `InfisicalAuth`. |
-| `infisical.projectSlug` | `""` | Infisical project holding the SMTP secrets. |
-| `infisical.environmentSlug` | `""` | Infisical environment holding the SMTP secrets. |
+| `infisical.authRef.name` | `""` | `InfisicalAuth` used by the SMTP `InfisicalStaticSecret`. Required when `smtp.enabled`. |
+| `infisical.authRef.namespace` | `""` | Namespace of that `InfisicalAuth`. Required when `smtp.enabled`. |
+| `infisical.projectSlug` | `""` | Infisical project holding the SMTP secrets. Required when `smtp.enabled`. |
+| `infisical.environmentSlug` | `""` | Infisical environment holding the SMTP secrets. Required when `smtp.enabled`. |
 | `smtp.enabled` | `false` | `true` syncs the SMTP Secret. It doesn't wire env (see SMTP). |
 | `smtp.secretName` | `infisical-smtp-secret` | Name of the synced Kubernetes Secret. |
 | `smtp.secretPath` | `/infisical/smtp` | Infisical path to read from. |
@@ -100,8 +68,8 @@ Defaults are in `charts/values.yaml`. Environment values go in cluster-config.
 | `ingressRoute.entryPoints` | `[websecure]` | Traefik entry points. |
 | `ingressRoute.ingressClass` | `traefik-external` | Value of the `kubernetes.io/ingress.class` annotation. |
 | `ingressRoute.middlewares` | `[]` | List of `{name, namespace}`. |
-| `infisical-standalone.infisical.kubeSecretRef` | `infisical-bootstrap` | envFrom Secret. Must equal `bootstrap.existingSecret`. |
-| `infisical-standalone.infisical.extraEnv` | `SITE_URL` + six optional SMTP refs | Pod env. Replaced wholesale by cluster-config. |
+| `infisical-standalone.infisical.kubeSecretRef` | `infisical-bootstrap` | envFrom Secret with `ENCRYPTION_KEY` and `AUTH_SECRET`. Created by hand (see Before first install). |
+| `infisical-standalone.infisical.extraEnv` | `[]` | Pod env. cluster-config supplies the full list (`SITE_URL`, DB, Redis, SMTP). |
 | `infisical-standalone.ingress.enabled` | `false` | Upstream Ingress off. The IngressRoute does routing. |
 | `infisical-standalone.ingress.nginx.enabled` | `false` | Upstream ingress-nginx dependency off. |
 | `infisical-standalone.postgresql.enabled` | `false` | Bundled PostgreSQL off. |
@@ -115,11 +83,10 @@ Rules that bite:
 
 - `values.yaml` is not templated. `{{ }}` stays a literal string.
 - YAML anchors only work within one file. You can't point at an anchor in the chart defaults from cluster-config.
-- Lists replace wholesale. If cluster-config sets `extraEnv`, it must carry the full list, including `SITE_URL` and the SMTP refs.
+- Lists replace wholesale. cluster-config's `extraEnv` is the full list, including `SITE_URL` and the SMTP refs.
 - Maps merge per key. `smtp.keys` is a map, so you can override one key and keep the rest.
 - `$(VAR)` only expands variables defined earlier in the same list. Put `DB_USER`, `DB_PASSWORD` and the rest before `DB_CONNECTION_URI`.
 - `$(VAR)` composition doesn't percent-encode. A password with `@`, `:`, `/` or `?` breaks the URI. Use URL-safe credentials or the CNPG `uri` key below.
-- The guards require exactly one `SITE_URL` entry that reads `infisical-config`/`SITE_URL`.
 
 See `apps/dev/infisical.yaml` in `raulstechtips/cluster-config` for the live values.
 
@@ -138,7 +105,7 @@ kubectl -n infisical exec deploy/infisical-infisical-standalone-infisical -- env
 
 ## Changing env
 
-Running pods don't pick up a new `SITE_URL`, a changed ConfigMap or a changed SMTP Secret.
+Running pods don't pick up a changed SMTP Secret. A changed `extraEnv` (such as `SITE_URL`) rolls the pods on its own.
 Roll them on purpose: bump `infisical-standalone.infisical.podAnnotations.configRevision` in cluster-config and sync.
 
 ```yaml
@@ -197,7 +164,7 @@ There is no CNPG backup of `pg-infisical` today. Without the database, the keys 
    kubectl -n infisical get svc redis-infisical-master
    kubectl -n infisical get secret infisical-redis-admin-credentials-secret
    ```
-8. `infisical-bootstrap` exists, created from NordPass (see Before first install). Keep `bootstrap.generateKeys: false`.
+8. `infisical-bootstrap` exists, created from NordPass (see Before first install).
    ```sh
    kubectl -n infisical get secret infisical-bootstrap -o jsonpath='{.data}' | grep -c ENCRYPTION_KEY
    ```
@@ -217,4 +184,4 @@ To upgrade Infisical:
 3. Merge, then sync the Application when you're ready.
 
 The upstream chart also has `infisical.autoBootstrap` and a Secret named `infisical-bootstrap-secret`. That feature bootstraps the first org and admin user.
-It has nothing to do with the wrapper's `bootstrap.*` keys or the `infisical-bootstrap` Secret. We don't use it.
+It has nothing to do with the `infisical-bootstrap` Secret. We don't use it.

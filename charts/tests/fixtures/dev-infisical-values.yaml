@@ -1,9 +1,5 @@
 # Dev values for the infisical wrapper chart (ghcr.io/raulstechtips/charts/infisical).
 # No secret values here: the root keys live in Secret infisical-bootstrap (created by hand from NordPass).
-# Public site URL, served through the ConfigMap infisical-config.
-siteUrl: https://infisical.prod.raulstechtips.dev
-bootstrap:
-  existingSecret: infisical-bootstrap
 # Infisical connection for the optional SMTP secret sync (shared auth from DEVSECOPS-153).
 infisical:
   authRef:
@@ -72,10 +68,7 @@ infisical-standalone:
     # Lists replace wholesale, so this is the full env list for the pod.
     extraEnv:
       - name: SITE_URL
-        valueFrom:
-          configMapKeyRef:
-            name: infisical-config
-            key: SITE_URL
+        value: https://infisical.prod.raulstechtips.dev
       # The private build reports usage upstream by default.
       - name: TELEMETRY_ENABLED
         value: "false"

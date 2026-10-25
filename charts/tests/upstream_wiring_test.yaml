@@ -39,36 +39,31 @@ tests:
           path: spec.selector
           value: {component: infisical, app: infisical-standalone, release: infisical}
 
-  - it: wires SITE_URL and the optional SMTP refs by default
+  - it: renders no env entries by default
     template: charts/infisical-standalone/templates/infisical.yaml
     documentIndex: 0
     asserts:
-      - equal:
+      - isNull:
           path: spec.template.spec.containers[0].env
-          value:
-            - {name: SITE_URL, valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}}
-            - {name: SMTP_HOST, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_HOST, optional: true}}}
-            - {name: SMTP_USERNAME, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_USERNAME, optional: true}}}
-            - {name: SMTP_PASSWORD, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_PASSWORD, optional: true}}}
-            - {name: SMTP_FROM_ADDRESS, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_FROM_ADDRESS, optional: true}}}
-            - {name: SMTP_FROM_NAME, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_FROM_NAME, optional: true}}}
-            - {name: SMTP_HELO_HOST, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_HELO_HOST, optional: true}}}
 
-  - it: passes an extra env entry through unchanged
+  - it: passes extra env entries through unchanged
     template: charts/infisical-standalone/templates/infisical.yaml
     documentIndex: 0
     set:
       infisical-standalone.infisical.extraEnv:
         - name: SITE_URL
-          valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}
+          value: https://infisical.example.test
         - name: SAMPLE_SETTING
           value: sample-value
     asserts:
       - equal:
           path: spec.template.spec.containers[0].env
           value:
-            - {name: SITE_URL, valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}}
+            - {name: SITE_URL, value: https://infisical.example.test}
             - {name: SAMPLE_SETTING, value: sample-value}
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: infisical-bootstrap
 
   - it: renders the dev env list in dependency order with unique names
     values:
@@ -79,12 +74,12 @@ tests:
       - lengthEqual:
           path: spec.template.spec.containers[0].env
           count: 20
-      # The exact list proves order (DB_* before DB_CONNECTION_URI, REDIS_* before REDIS_URL),
-      # unique names, string ports and which refs are optional.
+      # The exact list proves SITE_URL appears once as a literal, DB_* precede DB_CONNECTION_URI,
+      # REDIS_* precede REDIS_URL, names are unique, ports are strings and only SMTP refs are optional.
       - equal:
           path: spec.template.spec.containers[0].env
           value:
-            - {name: SITE_URL, valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}}
+            - {name: SITE_URL, value: https://infisical.prod.raulstechtips.dev}
             - {name: TELEMETRY_ENABLED, value: "false"}
             - {name: ALLOW_INTERNAL_IP_CONNECTIONS, value: "true"}
             - {name: DB_HOST, value: pg-prod-rw.prod.svc.cluster.local}

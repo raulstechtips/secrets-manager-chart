@@ -1,4 +1,2 @@
-{{- if .Values.bootstrap.generateKeys }}
-IMPORTANT: bootstrap.generateKeys is true. If the Secret "{{ .Values.bootstrap.existingSecret }}" did not exist, it was generated in namespace {{ .Release.Namespace }}.
-Back it up to NordPass immediately (ENCRYPTION_KEY and AUTH_SECRET). Losing these keys makes all stored secrets unrecoverable.
-{{- end }}
+Infisical reads ENCRYPTION_KEY and AUTH_SECRET from the Secret "{{ index .Values "infisical-standalone" "infisical" "kubeSecretRef" }}" in namespace {{ .Release.Namespace }}.
+It must exist before install and be backed up in NordPass. Losing these keys makes all stored secrets unrecoverable.

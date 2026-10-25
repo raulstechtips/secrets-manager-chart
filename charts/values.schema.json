@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": true,
-  "required": ["siteUrl", "bootstrap", "infisical", "smtp", "ingressRoute", "infisical-standalone"],
+  "required": ["infisical", "smtp", "ingressRoute", "infisical-standalone"],
   "definitions": {
     "middlewares": {
       "type": "array",
@@ -18,17 +18,6 @@
     }
   },
   "properties": {
-    "siteUrl": { "type": "string" },
-    "bootstrap": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["generateKeys", "existingSecret", "jobImage"],
-      "properties": {
-        "generateKeys": { "type": "boolean" },
-        "existingSecret": { "type": "string" },
-        "jobImage": { "type": "string" }
-      }
-    },
     "infisical": {
       "type": "object",
       "additionalProperties": false,

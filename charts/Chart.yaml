@@ -1,6 +1,6 @@
 apiVersion: v2
 name: infisical
-description: "Infisical wrapper chart: upstream infisical-standalone plus bootstrap keys, SMTP secret sync and Traefik IngressRoute."
+description: "Infisical wrapper chart: upstream infisical-standalone plus SMTP secret sync and Traefik IngressRoute."
 type: application
 version: 1.0.0
 appVersion: "v0.162.21"

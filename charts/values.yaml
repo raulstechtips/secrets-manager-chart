@@ -1,18 +1,6 @@
 # Wrapper chart defaults. No environment-specific values live here; set them in cluster-config.
 # This file is not templated. YAML anchors only work within one file.
 
-# Public URL of Infisical. Rendered to ConfigMap infisical-config key SITE_URL.
-# Non-empty default is required: the shared pipeline renders and lints with no overrides.
-siteUrl: "http://localhost:8080"
-
-bootstrap:
-  # true -> a PreSync Job creates existingSecret ONLY if it is missing (fresh installs).
-  generateKeys: false
-  # Name of the Secret holding ENCRYPTION_KEY and AUTH_SECRET. Required. An existing Secret always wins.
-  existingSecret: infisical-bootstrap
-  # Public, digest-pinned tools image (kubectl, head, od, and base64) used by the key generation Job.
-  jobImage: alpine/k8s:1.30.14@sha256:3c6d1e613d94f03d63a6213b8687c7d4e5b9154903327aa8f0b5d628d7ab010b
-
 # The wrapper's Infisical operator connection (same shape as the jenkins chart).
 infisical:
   # InfisicalAuth reference used by the SMTP InfisicalStaticSecret.
@@ -60,53 +48,11 @@ ingressRoute:
 # Values passed to the upstream infisical-standalone dependency (used as-is, never forked).
 infisical-standalone:
   infisical:
-    # Secret supplying ENCRYPTION_KEY and AUTH_SECRET via envFrom. Must equal bootstrap.existingSecret.
+    # Secret supplying ENCRYPTION_KEY and AUTH_SECRET via envFrom.
+    # Create it by hand from NordPass before the first install (see README).
     kubeSecretRef: infisical-bootstrap
-    # Default env wiring. cluster-config replaces the whole list (lists are not merged).
-    extraEnv:
-      # Site URL from the wrapper ConfigMap.
-      - name: SITE_URL
-        valueFrom:
-          configMapKeyRef:
-            name: infisical-config
-            key: SITE_URL
-      # SMTP settings from the optional SMTP Secret (absent Secret is tolerated).
-      - name: SMTP_HOST
-        valueFrom:
-          secretKeyRef:
-            name: infisical-smtp-secret
-            key: SMTP_HOST
-            optional: true
-      - name: SMTP_USERNAME
-        valueFrom:
-          secretKeyRef:
-            name: infisical-smtp-secret
-            key: SMTP_USERNAME
-            optional: true
-      - name: SMTP_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: infisical-smtp-secret
-            key: SMTP_PASSWORD
-            optional: true
-      - name: SMTP_FROM_ADDRESS
-        valueFrom:
-          secretKeyRef:
-            name: infisical-smtp-secret
-            key: SMTP_FROM_ADDRESS
-            optional: true
-      - name: SMTP_FROM_NAME
-        valueFrom:
-          secretKeyRef:
-            name: infisical-smtp-secret
-            key: SMTP_FROM_NAME
-            optional: true
-      - name: SMTP_HELO_HOST
-        valueFrom:
-          secretKeyRef:
-            name: infisical-smtp-secret
-            key: SMTP_HELO_HOST
-            optional: true
+    # Pod env. cluster-config supplies the full list (SITE_URL, DB, Redis, SMTP).
+    extraEnv: []
   ingress:
     # Upstream Ingress off; routing is the wrapper IngressRoute.
     enabled: false

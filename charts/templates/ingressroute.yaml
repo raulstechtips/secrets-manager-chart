@@ -12,7 +12,7 @@ spec:
   entryPoints:
     {{- toYaml .Values.ingressRoute.entryPoints | nindent 4 }}
   routes:
-    - match: {{ printf "Host(`%s`)" .Values.ingressRoute.host | quote }}
+    - match: {{ printf "Host(`%s`)" (required "ingressRoute.host is required when ingressRoute.enabled is true" .Values.ingressRoute.host) | quote }}
       kind: Rule
       {{- with .Values.ingressRoute.middlewares }}
       middlewares:
@@ -22,5 +22,5 @@ spec:
         - name: {{ include "infisical.fullname" (index .Subcharts "infisical-standalone") }}
           port: 8080
   tls:
-    secretName: {{ .Values.ingressRoute.tlsSecretName | quote }}
+    secretName: {{ required "ingressRoute.tlsSecretName is required when ingressRoute.enabled is true" .Values.ingressRoute.tlsSecretName | quote }}
 {{- end }}
