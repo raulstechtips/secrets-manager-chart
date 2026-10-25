@@ -1,0 +1,267 @@
+suite: Render guards and values schema
+templates:
+  - templates/configmap.yaml
+release:
+  name: infisical
+  namespace: infisical
+tests:
+  - it: fails on an empty siteUrl
+    set:
+      siteUrl: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: siteUrl must not be empty
+
+  - it: fails on an empty bootstrap.existingSecret
+    set:
+      bootstrap.existingSecret: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: bootstrap.existingSecret must not be empty
+
+  - it: fails when kubeSecretRef differs from bootstrap.existingSecret
+    set:
+      infisical-standalone.infisical.kubeSecretRef: other-secret
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical-standalone.infisical.kubeSecretRef ("other-secret") must equal bootstrap.existingSecret ("infisical-bootstrap")
+
+  - it: fails when smtp is on without infisical.authRef.name
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical.authRef.name: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.authRef.name is required when smtp.enabled is true
+
+  - it: fails when smtp is on without infisical.authRef.namespace
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical.authRef.namespace: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.authRef.namespace is required when smtp.enabled is true
+
+  - it: fails when smtp is on without infisical.projectSlug
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical.projectSlug: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.projectSlug is required when smtp.enabled is true
+
+  - it: fails when smtp is on without infisical.environmentSlug
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical.environmentSlug: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.environmentSlug is required when smtp.enabled is true
+
+  - it: fails when the route is on without a host
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.tlsSecretName: fake-infisical-tls
+    asserts:
+      - failedTemplate:
+          errorMessage: ingressRoute.host is required when ingressRoute.enabled is true
+
+  - it: fails when the route is on without a TLS Secret
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.host: infisical.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: ingressRoute.tlsSecretName is required when ingressRoute.enabled is true
+
+  - it: fails when generateKeys is on with an empty jobImage
+    set:
+      bootstrap.generateKeys: true
+      bootstrap.jobImage: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: bootstrap.jobImage must not be empty when bootstrap.generateKeys is true
+
+  - it: fails when extraEnv has no SITE_URL entry
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: TELEMETRY_ENABLED
+          value: "false"
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical-standalone.infisical.extraEnv must contain exactly one SITE_URL entry (found 0)
+
+  - it: fails when extraEnv has two SITE_URL entries
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: SITE_URL
+          valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}
+        - name: SITE_URL
+          valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical-standalone.infisical.extraEnv must contain exactly one SITE_URL entry (found 2)
+
+  - it: fails when SITE_URL is a literal value instead of the config map reference
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: SITE_URL
+          value: https://infisical.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical-standalone.infisical.extraEnv SITE_URL must reference configMapKeyRef infisical-config/SITE_URL
+
+  - it: fails when SITE_URL references another config map key
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: SITE_URL
+          valueFrom: {configMapKeyRef: {name: infisical-config, key: OTHER}}
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical-standalone.infisical.extraEnv SITE_URL must reference configMapKeyRef infisical-config/SITE_URL
+
+  - it: fails when smtp is on and an SMTP entry references another Secret
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: SITE_URL
+          valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}
+        - name: SMTP_HOST
+          valueFrom: {secretKeyRef: {name: other-secret, key: SMTP_HOST, optional: true}}
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical-standalone.infisical.extraEnv SMTP_HOST must reference smtp.secretName ("infisical-smtp-secret")
+
+  - it: fails when smtp is on and an SMTP entry uses a key missing from smtp.keys
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: SITE_URL
+          valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}
+        - name: SMTP_PORT
+          valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_PORT, optional: true}}
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical-standalone.infisical.extraEnv SMTP_PORT key "SMTP_PORT" is not in smtp.keys
+
+  - it: does not check SMTP entries while smtp is off
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: SITE_URL
+          valueFrom: {configMapKeyRef: {name: infisical-config, key: SITE_URL}}
+        - name: SMTP_HOST
+          valueFrom: {secretKeyRef: {name: other-secret, key: SMTP_HOST, optional: true}}
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: fails when upstream autoBootstrap writes to the bootstrap Secret
+    set:
+      infisical-standalone.infisical.autoBootstrap.enabled: true
+      infisical-standalone.infisical.autoBootstrap.secretDestination.name: infisical-bootstrap
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical-standalone.infisical.autoBootstrap.secretDestination.name must not equal bootstrap.existingSecret
+
+  - it: rejects a null wrapper boolean
+    set:
+      bootstrap.generateKeys: null
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - bootstrap: generateKeys is required
+
+  - it: rejects a null siteUrl
+    set:
+      siteUrl: null
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - (root): siteUrl is required
+
+  - it: rejects a quoted boolean for smtp.enabled
+    set:
+      smtp.enabled: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - smtp.enabled: Invalid type. Expected: boolean, given: string
+
+  - it: rejects a quoted boolean for ingressRoute.enabled
+    set:
+      ingressRoute.enabled: "false"
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - ingressRoute.enabled: Invalid type. Expected: boolean, given: string
+
+  - it: rejects a quoted boolean for bootstrap.generateKeys
+    set:
+      bootstrap.generateKeys: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - bootstrap.generateKeys: Invalid type. Expected: boolean, given: string
+
+  - it: rejects an unknown smtp key
+    set:
+      smtp.foo: x
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - smtp: Additional property foo is not allowed
+
+  - it: rejects an unknown key in the nested authRef
+    set:
+      infisical.authRef.extra: x
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - infisical.authRef: Additional property extra is not allowed
+
+  - it: rejects an unknown middleware field
+    set:
+      ingressRoute.middlewares: [{name: default-headers, ns: default}]
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - ingressRoute.middlewares.0: Additional property ns is not allowed
+
+  - it: rejects a non-string smtp.keys value
+    set:
+      smtp.keys.SMTP_HOST: 5
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - smtp.keys.SMTP_HOST: Invalid type. Expected: string, given: integer
+
+  - it: leaves upstream values open
+    set:
+      infisical-standalone.anyUpstreamKey: x
+    asserts:
+      - hasDocuments:
+          count: 1

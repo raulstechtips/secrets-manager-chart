@@ -1,0 +1,19 @@
+# Every wrapper feature on, with dummy non-secret strings. Used by helm lint, kubeconform and the unit tests.
+siteUrl: https://infisical.example.test
+bootstrap:
+  generateKeys: true
+  existingSecret: infisical-bootstrap
+  # The real pinned image: the pipeline image-scans every rendered image.
+  jobImage: alpine/k8s:1.30.14@sha256:3c6d1e613d94f03d63a6213b8687c7d4e5b9154903327aa8f0b5d628d7ab010b
+infisical:
+  authRef: {name: fake-auth, namespace: fake-auth-namespace}
+  projectSlug: fake-project
+  environmentSlug: fake-env
+smtp:
+  enabled: true
+  secretPath: /infisical/fake-smtp
+ingressRoute:
+  enabled: true
+  host: infisical.example.test
+  tlsSecretName: fake-infisical-tls
+  middlewares: [{name: default-headers, namespace: default}]
