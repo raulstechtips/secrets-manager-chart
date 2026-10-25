@@ -3,7 +3,6 @@ name: infisical
 description: "Infisical wrapper chart: upstream infisical-standalone plus SMTP secret sync and Traefik IngressRoute."
 type: application
 version: 1.0.0
-appVersion: "v0.162.21"
 dependencies:
   - name: infisical-standalone
     version: 1.10.0
