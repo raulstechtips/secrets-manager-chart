@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["siteUrl", "bootstrap", "infisical", "smtp", "ingressRoute", "infisical-standalone"],
+  "definitions": {
+    "middlewares": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "namespace": { "type": "string" }
+        }
+      }
+    }
+  },
+  "properties": {
+    "siteUrl": { "type": "string" },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["generateKeys", "existingSecret", "jobImage"],
+      "properties": {
+        "generateKeys": { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "jobImage": { "type": "string" }
+      }
+    },
+    "infisical": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authRef", "projectSlug", "environmentSlug"],
+      "properties": {
+        "authRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "namespace"],
+          "properties": {
+            "name": { "type": "string" },
+            "namespace": { "type": "string" }
+          }
+        },
+        "projectSlug": { "type": "string" },
+        "environmentSlug": { "type": "string" }
+      }
+    },
+    "smtp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "secretName", "secretPath", "refreshInterval", "keys"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "secretName": { "type": "string", "minLength": 1 },
+        "secretPath": { "type": "string", "minLength": 1 },
+        "refreshInterval": { "type": "string", "minLength": 1 },
+        "keys": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[-._a-zA-Z0-9]+$" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "ingressRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "host", "tlsSecretName", "entryPoints", "ingressClass", "middlewares"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" },
+        "tlsSecretName": { "type": "string" },
+        "entryPoints": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
+        "ingressClass": { "type": "string", "minLength": 1 },
+        "middlewares": { "$ref": "#/definitions/middlewares" }
+      }
+    },
+    "infisical-standalone": { "type": "object" }
+  }
+}

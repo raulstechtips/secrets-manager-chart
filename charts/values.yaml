@@ -1,0 +1,121 @@
+# Wrapper chart defaults. No environment-specific values live here; set them in cluster-config.
+# This file is not templated. YAML anchors only work within one file.
+
+# Public URL of Infisical. Rendered to ConfigMap infisical-config key SITE_URL.
+# Non-empty default is required: the shared pipeline renders and lints with no overrides.
+siteUrl: "http://localhost:8080"
+
+bootstrap:
+  # true -> a PreSync Job creates existingSecret ONLY if it is missing (fresh installs).
+  generateKeys: false
+  # Name of the Secret holding ENCRYPTION_KEY and AUTH_SECRET. Required. An existing Secret always wins.
+  existingSecret: infisical-bootstrap
+  # Public, digest-pinned tools image (kubectl, head, od, and base64) used by the key generation Job.
+  jobImage: alpine/k8s:1.30.14@sha256:3c6d1e613d94f03d63a6213b8687c7d4e5b9154903327aa8f0b5d628d7ab010b
+
+# The wrapper's Infisical operator connection (same shape as the jenkins chart).
+infisical:
+  # InfisicalAuth reference used by the SMTP InfisicalStaticSecret.
+  authRef:
+    name: ""
+    namespace: ""
+  # Infisical project slug holding the SMTP secrets.
+  projectSlug: ""
+  # Infisical environment slug holding the SMTP secrets.
+  environmentSlug: ""
+
+smtp:
+  # true -> sync the SMTP Secret through an InfisicalStaticSecret. Consumption is via extraEnv refs.
+  enabled: false
+  # Name of the Kubernetes Secret created for SMTP settings.
+  secretName: infisical-smtp-secret
+  # Infisical secret path to read the SMTP keys from.
+  secretPath: /infisical/smtp
+  # How often the operator re-syncs the Secret.
+  refreshInterval: 60s
+  # Map of target Secret key: Infisical key. Merges per key when overridden.
+  keys:
+    SMTP_FROM_ADDRESS: SMTP_FROM_ADDRESS
+    SMTP_FROM_NAME: SMTP_FROM_NAME
+    SMTP_HELO_HOST: SMTP_HELO_HOST
+    SMTP_HOST: SMTP_HOST
+    SMTP_PASSWORD: SMTP_PASSWORD
+    SMTP_USERNAME: SMTP_USERNAME
+
+ingressRoute:
+  # true -> render a Traefik IngressRoute pointing at the Infisical Service.
+  enabled: false
+  # Host to match (required when enabled).
+  host: ""
+  # TLS Secret name (required when enabled).
+  tlsSecretName: ""
+  # Traefik entry points.
+  entryPoints:
+    - websecure
+  # Value of the kubernetes.io/ingress.class annotation.
+  ingressClass: traefik-external
+  # Traefik middlewares: list of name and namespace entries.
+  middlewares: []
+
+# Values passed to the upstream infisical-standalone dependency (used as-is, never forked).
+infisical-standalone:
+  infisical:
+    # Secret supplying ENCRYPTION_KEY and AUTH_SECRET via envFrom. Must equal bootstrap.existingSecret.
+    kubeSecretRef: infisical-bootstrap
+    # Default env wiring. cluster-config replaces the whole list (lists are not merged).
+    extraEnv:
+      # Site URL from the wrapper ConfigMap.
+      - name: SITE_URL
+        valueFrom:
+          configMapKeyRef:
+            name: infisical-config
+            key: SITE_URL
+      # SMTP settings from the optional SMTP Secret (absent Secret is tolerated).
+      - name: SMTP_HOST
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_HOST
+            optional: true
+      - name: SMTP_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_USERNAME
+            optional: true
+      - name: SMTP_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_PASSWORD
+            optional: true
+      - name: SMTP_FROM_ADDRESS
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_FROM_ADDRESS
+            optional: true
+      - name: SMTP_FROM_NAME
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_FROM_NAME
+            optional: true
+      - name: SMTP_HELO_HOST
+        valueFrom:
+          secretKeyRef:
+            name: infisical-smtp-secret
+            key: SMTP_HELO_HOST
+            optional: true
+  ingress:
+    # Upstream Ingress off; routing is the wrapper IngressRoute.
+    enabled: false
+    # Upstream dependency condition for ingress-nginx (upstream default is true).
+    nginx:
+      enabled: false
+  # Bundled PostgreSQL off; DB env is supplied in cluster-config.
+  postgresql:
+    enabled: false
+  # Bundled Redis off; Redis env is supplied in cluster-config.
+  redis:
+    enabled: false

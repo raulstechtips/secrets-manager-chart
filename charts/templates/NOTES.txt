@@ -1,0 +1,4 @@
+{{- if .Values.bootstrap.generateKeys }}
+IMPORTANT: bootstrap.generateKeys is true. If the Secret "{{ .Values.bootstrap.existingSecret }}" did not exist, it was generated in namespace {{ .Release.Namespace }}.
+Back it up to NordPass immediately (ENCRYPTION_KEY and AUTH_SECRET). Losing these keys makes all stored secrets unrecoverable.
+{{- end }}
