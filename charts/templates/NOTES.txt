@@ -1,0 +1,2 @@
+Infisical reads ENCRYPTION_KEY and AUTH_SECRET from the Secret "{{ index .Values "infisical-standalone" "infisical" "kubeSecretRef" }}" in namespace {{ .Release.Namespace }}.
+It must exist before install and be backed up in NordPass. Losing these keys makes all stored secrets unrecoverable.

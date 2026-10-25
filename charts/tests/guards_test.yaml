@@ -1,0 +1,160 @@
+suite: Render guards and values schema
+templates:
+  - templates/smtp-secret.yaml
+  - templates/ingressroute.yaml
+release:
+  name: infisical
+  namespace: infisical
+tests:
+  - it: fails when smtp is on without infisical.authRef.name
+    template: templates/smtp-secret.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical.authRef.name: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.authRef.name is required when smtp.enabled is true
+
+  - it: fails when smtp is on without infisical.authRef.namespace
+    template: templates/smtp-secret.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical.authRef.namespace: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.authRef.namespace is required when smtp.enabled is true
+
+  - it: fails when smtp is on without infisical.projectSlug
+    template: templates/smtp-secret.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical.projectSlug: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.projectSlug is required when smtp.enabled is true
+
+  - it: fails when smtp is on without infisical.environmentSlug
+    template: templates/smtp-secret.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical.environmentSlug: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: infisical.environmentSlug is required when smtp.enabled is true
+
+  - it: does not require the Infisical connection while smtp is off
+    template: templates/smtp-secret.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: fails when the route is on without a host
+    template: templates/ingressroute.yaml
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.tlsSecretName: fake-infisical-tls
+    asserts:
+      - failedTemplate:
+          errorMessage: ingressRoute.host is required when ingressRoute.enabled is true
+
+  - it: fails when the route is on without a TLS Secret
+    template: templates/ingressroute.yaml
+    set:
+      ingressRoute.enabled: true
+      ingressRoute.host: infisical.example.test
+    asserts:
+      - failedTemplate:
+          errorMessage: ingressRoute.tlsSecretName is required when ingressRoute.enabled is true
+
+  - it: rejects a quoted boolean for smtp.enabled
+    template: templates/smtp-secret.yaml
+    set:
+      smtp.enabled: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - smtp.enabled: Invalid type. Expected: boolean, given: string
+
+  - it: rejects a quoted boolean for ingressRoute.enabled
+    template: templates/ingressroute.yaml
+    set:
+      ingressRoute.enabled: "false"
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - ingressRoute.enabled: Invalid type. Expected: boolean, given: string
+
+  - it: rejects a null wrapper boolean
+    template: templates/smtp-secret.yaml
+    set:
+      smtp.enabled: null
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - smtp: enabled is required
+
+  - it: rejects an unknown smtp key
+    template: templates/smtp-secret.yaml
+    set:
+      smtp.foo: x
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - smtp: Additional property foo is not allowed
+
+  - it: rejects an unknown key in the nested authRef
+    template: templates/smtp-secret.yaml
+    set:
+      infisical.authRef.extra: x
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - infisical.authRef: Additional property extra is not allowed
+
+  - it: rejects an unknown middleware field
+    template: templates/ingressroute.yaml
+    set:
+      ingressRoute.middlewares:
+        - name: default-headers
+          ns: default
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - ingressRoute.middlewares.0: Additional property ns is not allowed
+
+  - it: rejects a non-string smtp.keys value
+    template: templates/smtp-secret.yaml
+    set:
+      smtp.keys.SMTP_HOST: 5
+    asserts:
+      - failedTemplate:
+          errorMessage: |
+            values don't meet the specifications of the schema(s) in the following chart(s):
+            infisical:
+            - smtp.keys.SMTP_HOST: Invalid type. Expected: string, given: integer
+
+  - it: leaves upstream values open
+    template: templates/smtp-secret.yaml
+    values:
+      - ../ci/all-on-values.yaml
+    set:
+      infisical-standalone.anyUpstreamKey: x
+    asserts:
+      - hasDocuments:
+          count: 1

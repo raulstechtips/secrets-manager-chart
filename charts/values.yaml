@@ -1,0 +1,67 @@
+# Wrapper chart defaults. No environment-specific values live here; set them in cluster-config.
+# This file is not templated. YAML anchors only work within one file.
+
+# The wrapper's Infisical operator connection (same shape as the jenkins chart).
+infisical:
+  # InfisicalAuth reference used by the SMTP InfisicalStaticSecret.
+  authRef:
+    name: ""
+    namespace: ""
+  # Infisical project slug holding the SMTP secrets.
+  projectSlug: ""
+  # Infisical environment slug holding the SMTP secrets.
+  environmentSlug: ""
+
+smtp:
+  # true -> sync the SMTP Secret through an InfisicalStaticSecret. Consumption is via extraEnv refs.
+  enabled: false
+  # Name of the Kubernetes Secret created for SMTP settings.
+  secretName: infisical-smtp-secret
+  # Infisical secret path to read the SMTP keys from.
+  secretPath: /infisical/smtp
+  # How often the operator re-syncs the Secret.
+  refreshInterval: 60s
+  # Map of target Secret key: Infisical key. Merges per key when overridden.
+  keys:
+    SMTP_FROM_ADDRESS: SMTP_FROM_ADDRESS
+    SMTP_FROM_NAME: SMTP_FROM_NAME
+    SMTP_HELO_HOST: SMTP_HELO_HOST
+    SMTP_HOST: SMTP_HOST
+    SMTP_PASSWORD: SMTP_PASSWORD
+    SMTP_USERNAME: SMTP_USERNAME
+
+ingressRoute:
+  # true -> render a Traefik IngressRoute pointing at the Infisical Service.
+  enabled: false
+  # Host to match (required when enabled).
+  host: ""
+  # TLS Secret name (required when enabled).
+  tlsSecretName: ""
+  # Traefik entry points.
+  entryPoints:
+    - websecure
+  # Value of the kubernetes.io/ingress.class annotation.
+  ingressClass: traefik-external
+  # Traefik middlewares: list of name and namespace entries.
+  middlewares: []
+
+# Values passed to the upstream infisical-standalone dependency (used as-is, never forked).
+infisical-standalone:
+  infisical:
+    # Secret supplying ENCRYPTION_KEY and AUTH_SECRET via envFrom.
+    # Create it by hand from NordPass before the first install (see README).
+    kubeSecretRef: infisical-bootstrap
+    # Pod env. cluster-config supplies the full list (SITE_URL, DB, Redis, SMTP).
+    extraEnv: []
+  ingress:
+    # Upstream Ingress off; routing is the wrapper IngressRoute.
+    enabled: false
+    # Upstream dependency condition for ingress-nginx (upstream default is true).
+    nginx:
+      enabled: false
+  # Bundled PostgreSQL off; DB env is supplied in cluster-config.
+  postgresql:
+    enabled: false
+  # Bundled Redis off; Redis env is supplied in cluster-config.
+  redis:
+    enabled: false

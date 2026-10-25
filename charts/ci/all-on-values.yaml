@@ -1,0 +1,17 @@
+# Every wrapper feature on, with dummy non-secret strings. Used by helm lint, kubeconform and the unit tests.
+infisical:
+  authRef:
+    name: fake-auth
+    namespace: fake-auth-namespace
+  projectSlug: fake-project
+  environmentSlug: fake-env
+smtp:
+  enabled: true
+  secretPath: /infisical/fake-smtp
+ingressRoute:
+  enabled: true
+  host: infisical.example.test
+  tlsSecretName: fake-infisical-tls
+  middlewares:
+    - name: default-headers
+      namespace: default

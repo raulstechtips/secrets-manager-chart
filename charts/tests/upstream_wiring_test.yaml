@@ -1,0 +1,126 @@
+suite: Upstream infisical-standalone wiring
+templates:
+  - charts/infisical-standalone/templates/infisical.yaml
+  - charts/infisical-standalone/templates/ingress.yaml
+  - charts/infisical-standalone/charts/ingress-nginx/templates/controller-deployment.yaml
+release:
+  name: infisical
+  namespace: infisical
+tests:
+  - it: keeps the upstream Deployment name and selector labels from 1.10.0
+    template: charts/infisical-standalone/templates/infisical.yaml
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: metadata.name
+          value: infisical-infisical-standalone-infisical
+      - equal:
+          path: spec.selector.matchLabels
+          value: {component: infisical, app: infisical-standalone, release: infisical}
+      - equal:
+          path: spec.template.metadata.labels
+          value: {component: infisical, app: infisical-standalone, release: infisical}
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value: [{secretRef: {name: infisical-bootstrap}}]
+
+  - it: keeps the upstream Service name and selector
+    template: charts/infisical-standalone/templates/infisical.yaml
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: infisical-infisical-standalone-infisical
+      - equal:
+          path: spec.selector
+          value: {component: infisical, app: infisical-standalone, release: infisical}
+
+  - it: renders no env entries by default
+    template: charts/infisical-standalone/templates/infisical.yaml
+    documentIndex: 0
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].env
+
+  - it: passes extra env entries through unchanged
+    template: charts/infisical-standalone/templates/infisical.yaml
+    documentIndex: 0
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: SITE_URL
+          value: https://infisical.example.test
+        - name: SAMPLE_SETTING
+          value: sample-value
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - {name: SITE_URL, value: https://infisical.example.test}
+            - {name: SAMPLE_SETTING, value: sample-value}
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: infisical-bootstrap
+
+  - it: renders the dev env list in dependency order with unique names
+    values:
+      - fixtures/dev-infisical-values.yaml
+    template: charts/infisical-standalone/templates/infisical.yaml
+    documentIndex: 0
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].env
+          count: 20
+      # The exact list proves SITE_URL appears once as a literal, DB_* precede DB_CONNECTION_URI,
+      # REDIS_* precede REDIS_URL, names are unique, ports are strings and only SMTP refs are optional.
+      - equal:
+          path: spec.template.spec.containers[0].env
+          value:
+            - {name: SITE_URL, value: https://infisical.prod.raulstechtips.dev}
+            - {name: TELEMETRY_ENABLED, value: "false"}
+            - {name: ALLOW_INTERNAL_IP_CONNECTIONS, value: "true"}
+            - {name: DB_HOST, value: pg-prod-rw.prod.svc.cluster.local}
+            - {name: DB_PORT, value: "5432"}
+            - {name: DB_NAME, value: pg-infisical}
+            - {name: DB_USER, value: infisical-pg-admin}
+            - {name: DB_PASSWORD, valueFrom: {secretKeyRef: {name: pg-infisical-database-credentials-secret, key: password}}}
+            - {name: DB_SSL_ROOT_CERT, value: /etc/custom-certs/postgres-ca.crt}
+            - {name: DB_CONNECTION_URI, value: "postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=verify-ca&sslrootcert=$(DB_SSL_ROOT_CERT)"}
+            - {name: REDIS_HOST, value: redis-infisical-master.infisical.svc.cluster.local}
+            - {name: REDIS_PORT, value: "6379"}
+            - {name: REDIS_PASSWORD, valueFrom: {secretKeyRef: {name: infisical-redis-admin-credentials-secret, key: redis-password}}}
+            - {name: REDIS_URL, value: "redis://default:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)"}
+            - {name: SMTP_HOST, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_HOST, optional: true}}}
+            - {name: SMTP_USERNAME, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_USERNAME, optional: true}}}
+            - {name: SMTP_PASSWORD, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_PASSWORD, optional: true}}}
+            - {name: SMTP_FROM_ADDRESS, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_FROM_ADDRESS, optional: true}}}
+            - {name: SMTP_FROM_NAME, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_FROM_NAME, optional: true}}}
+            - {name: SMTP_HELO_HOST, valueFrom: {secretKeyRef: {name: infisical-smtp-secret, key: SMTP_HELO_HOST, optional: true}}}
+      - isNull:
+          path: spec.template.spec.containers[0].env[7].valueFrom.secretKeyRef.optional
+      - isNull:
+          path: spec.template.spec.containers[0].env[12].valueFrom.secretKeyRef.optional
+      - equal:
+          path: spec.template.spec.containers[0].envFrom
+          value: [{secretRef: {name: infisical-bootstrap}}]
+
+  - it: renders no upstream Ingress by default
+    template: charts/infisical-standalone/templates/ingress.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # helm-unittest 0.3.1 cannot assert on a subchart its condition drops (the template is absent),
+  # so this proves the condition gates ingress-nginx; the default-off render is checked by helm template in CI evidence.
+  - it: renders the ingress-nginx controller when its condition is turned on
+    set:
+      infisical-standalone.ingress.nginx.enabled: true
+    template: charts/infisical-standalone/charts/ingress-nginx/templates/controller-deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Deployment
