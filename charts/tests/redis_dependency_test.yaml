@@ -1,0 +1,63 @@
+suite: Custom Redis dependency wiring
+templates:
+  - charts/redis/templates/statefulsets.yaml
+  - charts/redis/templates/services.yaml
+  - charts/redis/templates/certificate.yaml
+  - charts/redis/templates/networkpolicy.yaml
+release:
+  name: infisical
+  namespace: infisical
+tests:
+  - it: uses the existing bootstrap password and standalone persistent Redis
+    template: charts/redis/templates/statefulsets.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: infisical-redis-node
+      - equal:
+          path: spec.replicas
+          value: 1
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: auth
+            secret:
+              secretName: infisical-redis-admin-credentials-secret
+              defaultMode: 288
+              items:
+                - key: redis-password
+                  path: password
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.storageClassName
+          value: longhorn-storage-class-replicas-1
+  - it: exposes the hostname used by the application URL
+    template: charts/redis/templates/services.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: metadata.name
+          value: infisical-redis
+  - it: requests the internal CA certificate mounted by the application
+    template: charts/redis/templates/certificate.yaml
+    asserts:
+      - equal:
+          path: spec.secretName
+          value: infisical-redis-tls
+      - equal:
+          path: spec.issuerRef
+          value:
+            name: raulstechtips-internal-ca-issuer
+            kind: ClusterIssuer
+            group: cert-manager.io
+  - it: allows the actual upstream Infisical pod labels
+    template: charts/redis/templates/networkpolicy.yaml
+    asserts:
+      - contains:
+          path: spec.ingress[0].from
+          content:
+            podSelector:
+              matchLabels:
+                component: infisical
+                app: infisical-standalone

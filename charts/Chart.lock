@@ -1,6 +1,9 @@
 dependencies:
+- name: redis
+  repository: oci://ghcr.io/raulstechtips/charts
+  version: 0.1.0-feature-devsecops-190-087d631-8eb3efb-5
 - name: infisical-standalone
   repository: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/
   version: 1.10.0
-digest: sha256:95b370a505627ab2b903badfbe7f617d287eef7d2b034dfacbaa16a663e65daa
-generated: "2026-10-25T01:59:10.936198-04:00"
+digest: sha256:d0916a8ecadc74c2a2a9721e117b1a7b5e0176f286b6aa51dda5773d30542445
+generated: "2026-11-07T19:54:59.241595-05:00"

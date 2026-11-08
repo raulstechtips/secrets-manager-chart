@@ -45,14 +45,50 @@ ingressRoute:
   # Traefik middlewares: list of name and namespace entries.
   middlewares: []
 
+# Custom Redis dependency. Keep credentials available before Infisical starts.
+redis:
+  fullnameOverride: infisical-redis
+  mode: standalone
+  auth:
+    existingSecret: infisical-redis-admin-credentials-secret
+    passwordKey: redis-password
+  tls:
+    enabled: true
+  networkPolicy:
+    ingressFrom:
+      - podSelector:
+          matchLabels:
+            component: infisical
+            app: infisical-standalone
+
 # Values passed to the upstream infisical-standalone dependency (used as-is, never forked).
 infisical-standalone:
   infisical:
     # Secret supplying ENCRYPTION_KEY and AUTH_SECRET via envFrom.
     # Create it by hand from NordPass before the first install (see README).
     kubeSecretRef: infisical-bootstrap
-    # Pod env. cluster-config supplies the full list (SITE_URL, DB, Redis, SMTP).
-    extraEnv: []
+    # Lists replace wholesale: retain these entries in environment overrides.
+    extraEnv:
+      - name: REDIS_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: infisical-redis-admin-credentials-secret
+            key: redis-password
+      - name: REDIS_URL
+        value: rediss://default:$(REDIS_PASSWORD)@infisical-redis:6379
+      - name: NODE_EXTRA_CA_CERTS
+        value: /etc/redis-ca/ca.crt
+    extraVolumes:
+      - name: redis-ca
+        secret:
+          secretName: infisical-redis-tls
+          items:
+            - key: ca.crt
+              path: ca.crt
+    extraVolumeMounts:
+      - name: redis-ca
+        mountPath: /etc/redis-ca
+        readOnly: true
   ingress:
     # Upstream Ingress off; routing is the wrapper IngressRoute.
     enabled: false
@@ -62,6 +98,6 @@ infisical-standalone:
   # Bundled PostgreSQL off; DB env is supplied in cluster-config.
   postgresql:
     enabled: false
-  # Bundled Redis off; Redis env is supplied in cluster-config.
+  # Upstream Bitnami Redis off; the wrapper owns the custom Redis dependency.
   redis:
     enabled: false
