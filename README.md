@@ -15,7 +15,7 @@ The wrapper owns these resources:
 Infisical's Deployment, Service and ServiceAccount come from the upstream chart.
 The upstream Ingress, bundled PostgreSQL and Bitnami Redis are off. The database is CNPG.
 The wrapper installs our custom Redis chart as a separate dependency, pinned to
-`0.1.0-feature-devsecops-190-087d631-8eb3efb-5` from
+`0.1.0-main-4353890-1` from
 `oci://ghcr.io/raulstechtips/charts`.
 
 ## Redis dependency
