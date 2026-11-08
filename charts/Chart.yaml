@@ -4,6 +4,9 @@ description: "Infisical wrapper chart: upstream infisical-standalone plus SMTP s
 type: application
 version: 0.1.0-main-650fc99-3
 dependencies:
+  - name: redis
+    version: 0.1.0-main-4353890-1
+    repository: oci://ghcr.io/raulstechtips/charts
   - name: infisical-standalone
     version: 1.10.0
     repository: https://dl.cloudsmith.io/public/infisical/helm-charts/helm/charts/

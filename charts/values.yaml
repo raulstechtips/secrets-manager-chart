@@ -45,13 +45,30 @@ ingressRoute:
   # Traefik middlewares: list of name and namespace entries.
   middlewares: []
 
+# Custom Redis dependency. Keep credentials available before Infisical starts.
+redis:
+  fullnameOverride: infisical-redis
+  mode: standalone
+  auth:
+    existingSecret: infisical-redis-admin-credentials-secret
+    passwordKey: redis-password
+  tls:
+    enabled: true
+  networkPolicy:
+    ingressFrom:
+      - podSelector:
+          matchLabels:
+            component: infisical
+            app: infisical-standalone
+
 # Values passed to the upstream infisical-standalone dependency (used as-is, never forked).
 infisical-standalone:
   infisical:
     # Secret supplying ENCRYPTION_KEY and AUTH_SECRET via envFrom.
     # Create it by hand from NordPass before the first install (see README).
     kubeSecretRef: infisical-bootstrap
-    # Pod env. cluster-config supplies the full list (SITE_URL, DB, Redis, SMTP).
+    # Lists replace wholesale. cluster-config supplies the complete environment
+    # and extraVolumes/extraVolumeMounts lists, including Redis TLS settings.
     extraEnv: []
   ingress:
     # Upstream Ingress off; routing is the wrapper IngressRoute.
@@ -62,6 +79,6 @@ infisical-standalone:
   # Bundled PostgreSQL off; DB env is supplied in cluster-config.
   postgresql:
     enabled: false
-  # Bundled Redis off; Redis env is supplied in cluster-config.
+  # Upstream Bitnami Redis off; the wrapper owns the custom Redis dependency.
   redis:
     enabled: false

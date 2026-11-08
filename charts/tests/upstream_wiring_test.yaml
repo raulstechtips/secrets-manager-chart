@@ -39,12 +39,59 @@ tests:
           path: spec.selector
           value: {component: infisical, app: infisical-standalone, release: infisical}
 
-  - it: renders no env entries by default
+  - it: passes Redis TLS connection settings and CA mounts from deployment values
     template: charts/infisical-standalone/templates/infisical.yaml
     documentIndex: 0
+    set:
+      infisical-standalone.infisical.extraEnv:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: infisical-redis-admin-credentials-secret
+              key: redis-password
+        - name: REDIS_URL
+          value: rediss://default:$(REDIS_PASSWORD)@infisical-redis:6379
+        - name: NODE_EXTRA_CA_CERTS
+          value: /etc/redis-ca/ca.crt
+      infisical-standalone.infisical.extraVolumes:
+        - name: redis-ca
+          secret:
+            secretName: infisical-redis-tls
+            items:
+              - key: ca.crt
+                path: ca.crt
+      infisical-standalone.infisical.extraVolumeMounts:
+        - name: redis-ca
+          mountPath: /etc/redis-ca
+          readOnly: true
     asserts:
-      - isNull:
+      - equal:
           path: spec.template.spec.containers[0].env
+          value:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: infisical-redis-admin-credentials-secret
+                  key: redis-password
+            - name: REDIS_URL
+              value: rediss://default:$(REDIS_PASSWORD)@infisical-redis:6379
+            - name: NODE_EXTRA_CA_CERTS
+              value: /etc/redis-ca/ca.crt
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: redis-ca
+            secret:
+              secretName: infisical-redis-tls
+              items:
+                - key: ca.crt
+                  path: ca.crt
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: redis-ca
+            mountPath: /etc/redis-ca
+            readOnly: true
 
   - it: passes extra env entries through unchanged
     template: charts/infisical-standalone/templates/infisical.yaml

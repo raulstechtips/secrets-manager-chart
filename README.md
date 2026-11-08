@@ -12,8 +12,47 @@ The wrapper owns these resources:
 - An optional `InfisicalStaticSecret` that syncs the SMTP Secret from Infisical (`smtp.enabled`).
 - An optional Traefik IngressRoute (`ingressRoute.enabled`).
 
-Everything else (Deployment, Service, ServiceAccount) comes from the upstream chart.
-The upstream Ingress, bundled PostgreSQL and bundled Redis are off. The database is CNPG and Redis runs on its own.
+Infisical's Deployment, Service and ServiceAccount come from the upstream chart.
+The upstream Ingress, bundled PostgreSQL and Bitnami Redis are off. The database is CNPG.
+The wrapper installs our custom Redis chart as a separate dependency, pinned to
+`0.1.0-main-4353890-1` from
+`oci://ghcr.io/raulstechtips/charts`.
+
+## Redis dependency
+
+The default is standalone Redis at `infisical-redis:6379`, with persistence,
+`noeviction`, one Longhorn storage replica, and internal-CA TLS. The deployment
+values in `cluster-config/apps/dev/infisical.yaml` configure Infisical to use
+`rediss://` and load the CA certificate mounted from `infisical-redis-tls`
+at `/etc/redis-ca/ca.crt` through `NODE_EXTRA_CA_CERTS`. The private TLS key is
+not mounted into Infisical.
+This connection profile is standalone. Switching to Sentinel also requires
+changing Infisical's client settings; changing only `redis.mode` is not sufficient.
+
+Infisical and its Redis dependency use the existing Secret `infisical-redis-admin-credentials-secret`,
+key `redis-password`. Make this credential available before Infisical starts:
+restore it from your password manager when bootstrapping an empty cluster.
+The dependency does not ask Infisical to provision its own startup credential.
+Use a URL-safe password, as the existing Kubernetes environment-variable
+composition does not percent-encode URI passwords.
+
+The Redis NetworkPolicy explicitly permits Infisical's upstream pod labels
+(`component: infisical`, `app: infisical-standalone`) in the same namespace.
+Those pods do not have the release-label format used by the Redis chart.
+
+Environment overrides replace `extraEnv`, `extraVolumes`, and `extraVolumeMounts`
+lists. The complete lists belong in `cluster-config/apps/dev/infisical.yaml`,
+including database, SMTP, Redis and application settings. Chart defaults do not
+supply application connection entries or CA mounts. The deployment values use
+`REDIS_HOST=infisical-redis`, a `rediss://` URL, and
+`NODE_EXTRA_CA_CERTS=/etc/redis-ca/ca.crt`. They keep the Redis CA mount alongside
+the PostgreSQL CA mount. Use these values with a chart version containing the
+custom Redis dependency; the previous chart does not create its Service or CA Secret.
+
+This creates new Redis PVCs. It does not move old queues or data, remove the old
+release, or delete its PVCs. Plan the application cutover and required data
+transfer before synchronizing Argo CD. Do not remove the old Redis until the
+application has been checked against the new instance.
 
 The chart is published to GHCR. Argo CD installs it with values from the `cluster-config` repository (`apps/dev/infisical.yaml`):
 
@@ -69,7 +108,7 @@ Defaults are in `charts/values.yaml`. Environment values go in cluster-config.
 | `ingressRoute.ingressClass` | `traefik-external` | Value of the `kubernetes.io/ingress.class` annotation. |
 | `ingressRoute.middlewares` | `[]` | List of `{name, namespace}`. |
 | `infisical-standalone.infisical.kubeSecretRef` | `infisical-bootstrap` | envFrom Secret with `ENCRYPTION_KEY` and `AUTH_SECRET`. Created by hand (see Before first install). |
-| `infisical-standalone.infisical.extraEnv` | `[]` | Pod env. cluster-config supplies the full list (`SITE_URL`, DB, Redis, SMTP). |
+| `infisical-standalone.infisical.extraEnv` | `[]` | cluster-config owns the complete environment list (`SITE_URL`, DB, Redis, SMTP). |
 | `infisical-standalone.ingress.enabled` | `false` | Upstream Ingress off. The IngressRoute does routing. |
 | `infisical-standalone.ingress.nginx.enabled` | `false` | Upstream ingress-nginx dependency off. |
 | `infisical-standalone.postgresql.enabled` | `false` | Bundled PostgreSQL off. |
@@ -159,9 +198,8 @@ There is no CNPG backup of `pg-infisical` today. Without the database, the keys 
    ```sh
    kubectl -n infisical get secret raulstechtips-internal-ca-key-pair
    ```
-7. Redis `redis-infisical` runs and its password Secret exists.
+7. The Redis password Secret exists before the wrapper starts its dependency.
    ```sh
-   kubectl -n infisical get svc redis-infisical-master
    kubectl -n infisical get secret infisical-redis-admin-credentials-secret
    ```
 8. `infisical-bootstrap` exists, created from NordPass (see Before first install).
