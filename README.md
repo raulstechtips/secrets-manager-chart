@@ -21,8 +21,9 @@ The wrapper installs our custom Redis chart as a separate dependency, pinned to
 ## Redis dependency
 
 The default is standalone Redis at `infisical-redis:6379`, with persistence,
-`noeviction`, one Longhorn storage replica, and internal-CA TLS. Infisical uses
-`rediss://` and trusts only the CA certificate mounted from `infisical-redis-tls`
+`noeviction`, one Longhorn storage replica, and internal-CA TLS. The deployment
+values in `cluster-config/apps/dev/infisical.yaml` configure Infisical to use
+`rediss://` and load the CA certificate mounted from `infisical-redis-tls`
 at `/etc/redis-ca/ca.crt` through `NODE_EXTRA_CA_CERTS`. The private TLS key is
 not mounted into Infisical.
 This connection profile is standalone. Switching to Sentinel also requires
@@ -40,11 +41,13 @@ The Redis NetworkPolicy explicitly permits Infisical's upstream pod labels
 Those pods do not have the release-label format used by the Redis chart.
 
 Environment overrides replace `extraEnv`, `extraVolumes`, and `extraVolumeMounts`
-lists. Retain the Redis entries from `charts/values.yaml` when adding database,
-SMTP or application settings. In particular, replace the old
-`redis-infisical-master` endpoint and plaintext Redis URL, and keep the Redis CA
-mount alongside the PostgreSQL CA mount. Existing cluster-config values must be
-updated before deployment; adding the dependency does not override those lists.
+lists. The complete lists belong in `cluster-config/apps/dev/infisical.yaml`,
+including database, SMTP, Redis and application settings. Chart defaults do not
+supply application connection entries or CA mounts. The deployment values use
+`REDIS_HOST=infisical-redis`, a `rediss://` URL, and
+`NODE_EXTRA_CA_CERTS=/etc/redis-ca/ca.crt`. They keep the Redis CA mount alongside
+the PostgreSQL CA mount. Use these values with a chart version containing the
+custom Redis dependency; the previous chart does not create its Service or CA Secret.
 
 This creates new Redis PVCs. It does not move old queues or data, remove the old
 release, or delete its PVCs. Plan the application cutover and required data
@@ -105,7 +108,7 @@ Defaults are in `charts/values.yaml`. Environment values go in cluster-config.
 | `ingressRoute.ingressClass` | `traefik-external` | Value of the `kubernetes.io/ingress.class` annotation. |
 | `ingressRoute.middlewares` | `[]` | List of `{name, namespace}`. |
 | `infisical-standalone.infisical.kubeSecretRef` | `infisical-bootstrap` | envFrom Secret with `ENCRYPTION_KEY` and `AUTH_SECRET`. Created by hand (see Before first install). |
-| `infisical-standalone.infisical.extraEnv` | Redis TLS connection entries | Pod env. cluster-config supplies the full list (`SITE_URL`, DB, Redis, SMTP). Retain the Redis entries. |
+| `infisical-standalone.infisical.extraEnv` | `[]` | cluster-config owns the complete environment list (`SITE_URL`, DB, Redis, SMTP). |
 | `infisical-standalone.ingress.enabled` | `false` | Upstream Ingress off. The IngressRoute does routing. |
 | `infisical-standalone.ingress.nginx.enabled` | `false` | Upstream ingress-nginx dependency off. |
 | `infisical-standalone.postgresql.enabled` | `false` | Bundled PostgreSQL off. |

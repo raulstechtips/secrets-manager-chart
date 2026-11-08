@@ -67,28 +67,9 @@ infisical-standalone:
     # Secret supplying ENCRYPTION_KEY and AUTH_SECRET via envFrom.
     # Create it by hand from NordPass before the first install (see README).
     kubeSecretRef: infisical-bootstrap
-    # Lists replace wholesale: retain these entries in environment overrides.
-    extraEnv:
-      - name: REDIS_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: infisical-redis-admin-credentials-secret
-            key: redis-password
-      - name: REDIS_URL
-        value: rediss://default:$(REDIS_PASSWORD)@infisical-redis:6379
-      - name: NODE_EXTRA_CA_CERTS
-        value: /etc/redis-ca/ca.crt
-    extraVolumes:
-      - name: redis-ca
-        secret:
-          secretName: infisical-redis-tls
-          items:
-            - key: ca.crt
-              path: ca.crt
-    extraVolumeMounts:
-      - name: redis-ca
-        mountPath: /etc/redis-ca
-        readOnly: true
+    # Lists replace wholesale. cluster-config supplies the complete environment
+    # and extraVolumes/extraVolumeMounts lists, including Redis TLS settings.
+    extraEnv: []
   ingress:
     # Upstream Ingress off; routing is the wrapper IngressRoute.
     enabled: false
